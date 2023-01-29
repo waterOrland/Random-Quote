@@ -12,6 +12,7 @@ protocol QuoteDataDelegate {
     func didFailWithError(error: Error)
 }
 
+
 struct QuoteManager {
     let url = "https://api.quotable.io/"
     
@@ -56,6 +57,47 @@ struct QuoteManager {
         } catch {
             delegate?.didFailWithError(error: error)
             return nil
+        }
+    }
+}
+
+extension URLRequest {
+    enum HTTPMethod: String {
+        case GET
+        case POST
+        case PUT
+        case DELETE
+    }
+    
+    init<T>(url: URL, method: HTTPMethod, body: T?) throws where T: Encodable {
+        self.init(url: url)
+        httpMethod = method.rawValue
+        if let body = body {
+            httpBody = try JSONEncoder().encode(body)
+        }
+    }
+}
+
+extension URLSession {
+    func dataTask<T>(with request: URLRequest, callback: @escaping (T?, Error?) -> Void) throws -> URLSessionTask where T: Decodable {
+        return URLSession.shared.dataTask(with: request) { data, response, error in
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    callback(nil, error)
+                    return
+                }
+                if let data = data {
+                    do {
+                        let result = try JSONDecoder().decode(T.self, from: data)
+                        callback(result, nil)
+                    } catch let error {
+                        callback(nil, error)
+                    }
+                } else {
+                    callback(nil, nil)
+                }
+            }
+            task.resume()
         }
     }
 }
